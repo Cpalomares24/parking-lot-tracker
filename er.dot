@@ -1,0 +1,70 @@
+digraph ER {
+  rankdir=LR; nodesep=0.5; ranksep=1.1; fontname="Helvetica";
+  node [shape=plain fontname="Helvetica" fontsize=11];
+  edge [fontname="Helvetica" fontsize=9 dir=both arrowtail=tee arrowhead=crow color="#444444"];
+
+  parking_lot [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="3">
+   <tr><td bgcolor="#1f4e79"><font color="white"><b>parking_lot</b></font></td></tr>
+   <tr><td align="left"><b>PK</b> lot_id</td></tr>
+   <tr><td align="left"><b>UK</b> lot_code</td></tr>
+   <tr><td align="left"><b>FK</b> parent_lot_id</td></tr>
+   <tr><td align="left">display_name, capacity</td></tr>
+   <tr><td align="left">address, latitude, longitude</td></tr>
+   <tr><td align="left">time_zone, is_active</td></tr>
+   <tr><td align="left">created_at, updated_at</td></tr></table>>];
+
+  occupancy_reading [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="3">
+   <tr><td bgcolor="#1f4e79"><font color="white"><b>occupancy_reading</b></font></td></tr>
+   <tr><td align="left"><b>PK</b> reading_id</td></tr>
+   <tr><td align="left"><b>FK, UK</b> lot_id</td></tr>
+   <tr><td align="left"><b>UK</b> recorded_at</td></tr>
+   <tr><td align="left">occupied_count, source</td></tr>
+   <tr><td align="left">ingested_at</td></tr></table>>];
+
+  lot_hours [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="3">
+   <tr><td bgcolor="#1f4e79"><font color="white"><b>lot_hours</b></font></td></tr>
+   <tr><td align="left"><b>PK</b> lot_hours_id</td></tr>
+   <tr><td align="left"><b>FK</b> lot_id</td></tr>
+   <tr><td align="left">day_of_week, open_time, close_time</td></tr>
+   <tr><td align="left">effective_from, effective_to</td></tr></table>>];
+
+  lot_closure [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="3">
+   <tr><td bgcolor="#1f4e79"><font color="white"><b>lot_closure</b></font></td></tr>
+   <tr><td align="left"><b>PK</b> closure_id</td></tr>
+   <tr><td align="left"><b>FK</b> lot_id</td></tr>
+   <tr><td align="left">starts_at, ends_at</td></tr>
+   <tr><td align="left">closure_type, spaces_closed, reason</td></tr></table>>];
+
+  rate_plan [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="3">
+   <tr><td bgcolor="#1f4e79"><font color="white"><b>rate_plan</b></font></td></tr>
+   <tr><td align="left"><b>PK</b> rate_plan_id</td></tr>
+   <tr><td align="left"><b>FK</b> lot_id</td></tr>
+   <tr><td align="left">plan_name, day_of_week</td></tr>
+   <tr><td align="left">start_time, end_time</td></tr>
+   <tr><td align="left">rate_amount, rate_unit</td></tr>
+   <tr><td align="left">free_minutes, max_daily, currency</td></tr>
+   <tr><td align="left">effective_from, effective_to</td></tr></table>>];
+
+  lot_requirement [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="3">
+   <tr><td bgcolor="#1f4e79"><font color="white"><b>lot_requirement</b></font></td></tr>
+   <tr><td align="left"><b>PK</b> lot_requirement_id</td></tr>
+   <tr><td align="left"><b>FK</b> lot_id</td></tr>
+   <tr><td align="left"><b>FK</b> requirement_type_id</td></tr>
+   <tr><td align="left">spaces_count</td></tr>
+   <tr><td align="left">applies_from, applies_to</td></tr>
+   <tr><td align="left">effective_from, effective_to</td></tr></table>>];
+
+  requirement_type [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="3">
+   <tr><td bgcolor="#1f4e79"><font color="white"><b>requirement_type</b></font></td></tr>
+   <tr><td align="left"><b>PK</b> requirement_type_id</td></tr>
+   <tr><td align="left"><b>UK</b> code</td></tr>
+   <tr><td align="left">name, description</td></tr></table>>];
+
+  parking_lot -> occupancy_reading;
+  parking_lot -> lot_hours;
+  parking_lot -> lot_closure;
+  parking_lot -> rate_plan;
+  parking_lot -> lot_requirement;
+  requirement_type -> lot_requirement;
+  parking_lot -> parking_lot [label="  parent / section"];
+}
