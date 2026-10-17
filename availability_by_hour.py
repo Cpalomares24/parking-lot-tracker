@@ -1,56 +1,55 @@
-# Import SQLite so Python can communicate with the ParkSmart database
-import sqlite3
+"""Calculate average hourly parking availability using MySQL."""
+
+import mysql.connector
+
+from import_data import connect
 
 
-# Connect to the existing ParkSmart database
-connection = sqlite3.connect("parksmart.db")
+def availability_by_hour():
+    """Calculate average availability percentages for each hour."""
 
-# Create a cursor so Python can send SQL queries to SQLite
-cursor = connection.cursor()
+    connection = connect()
 
+    try:
+        cursor = connection.cursor()
 
-# Calculate average parking availability percentage for each hour
-cursor.execute("""
-    SELECT
-        strftime('%H', parking_record.record_datetime) AS hour,
+        # The occupancy view provides readings and data-quality flags.
+        # Exclude invalid readings from availability calculations while
+        # preserving them in the database for future analysis.
+        cursor.execute("""
+            SELECT
+                HOUR(recorded_at) AS hour,
+                AVG(
+                    (CAST(capacity AS SIGNED) - occupied_count)
+                    * 100.0 / capacity
+                ) AS average_available_percentage
+            FROM v_occupancy
+            WHERE quality_flag = 'OK'
+            GROUP BY HOUR(recorded_at)
+            ORDER BY hour
+        """)
 
-        AVG(
-            (parking_location.capacity - parking_record.occupancy)
-            * 100.0 / parking_location.capacity
-        ) AS average_available_percentage
+        hourly_results = cursor.fetchall()
 
-    FROM parking_record
+        print("Average Parking Availability Percentage by Hour")
+        print("-----------------------------------------------")
 
-    JOIN parking_location
-        ON parking_record.parking_id = parking_location.parking_id
+        # Display each hour in 24-hour format.
+        for hour, average_percentage in hourly_results:
+            print(
+                f"{hour:02d}:00",
+                "- Average Availability:",
+                round(average_percentage, 2),
+                "%"
+            )
 
-    GROUP BY hour
-    ORDER BY hour
-""")
-
-# Get all results returned by the database
-hourly_results = cursor.fetchall()
-
-
-print("Average Parking Availability Percentage by Hour")
-print("-----------------------------------------------")
-
-
-# Display the average availability for each hour
-for result in hourly_results:
-
-    # Get the hour and average availability percentage
-    hour = result[0]
-    average_percentage = result[1]
-
-    # Display the results
-    print(
-        hour + ":00",
-        "- Average Availability:",
-        round(average_percentage, 2),
-        "%"
-    )
+    finally:
+        connection.close()
 
 
-# Close the database connection
-connection.close()
+if __name__ == "__main__":
+    try:
+        availability_by_hour()
+    except mysql.connector.Error as exc:
+        print(f"Database error: {exc}")
+        raise SystemExit(1) from exc

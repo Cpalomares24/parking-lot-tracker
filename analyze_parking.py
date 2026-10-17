@@ -1,55 +1,52 @@
-# Import SQLite so Python can communicate with our ParkSmart database
-import sqlite3
+"""Retrieve parking occupancy records from MySQL."""
+
+import mysql.connector
+
+from import_data import connect
 
 
-# Connect to the existing ParkSmart SQLite database
-connection = sqlite3.connect("parksmart.db")
+def analyze_parking():
+    """Retrieve and display five valid parking occupancy readings."""
 
-# Create a cursor so Python can send SQL queries to the database
-cursor = connection.cursor()
+    connection = connect()
 
-print("Connected to ParkSmart database!")
-print()
+    try:
+        cursor = connection.cursor()
 
-# Join parking_location and parking_record together
-# This lets us see the parking lot information and its occupancy records
-cursor.execute("""
-    SELECT
-        parking_location.system_code,
-        parking_location.capacity,
-        parking_record.occupancy,
-        parking_record.record_datetime
-    FROM parking_record
-    JOIN parking_location
-        ON parking_record.parking_id = parking_location.parking_id
-    ORDER BY parking_record.record_datetime
-    LIMIT 5
-""")
+        # The view joins parking lots with their occupancy readings
+        # and identifies invalid measurements using quality_flag.
+        cursor.execute("""
+            SELECT
+                lot_code,
+                capacity,
+                occupied_count,
+                recorded_at
+            FROM v_occupancy
+            WHERE quality_flag = 'OK'
+            ORDER BY recorded_at
+            LIMIT 5
+        """)
 
-# Get all rows returned by the SQL query
-parking_records = cursor.fetchall()
+        parking_records = cursor.fetchall()
 
+        # Calculate available spaces using the recorded occupancy.
+        for lot_code, capacity, occupancy, recorded_at in parking_records:
+            available = capacity - occupancy
 
-# Loop through the first 5 parking records
-for record in parking_records:
+            print("Parking Lot:", lot_code)
+            print("Capacity:", capacity)
+            print("Occupancy:", occupancy)
+            print("Available Spaces:", available)
+            print("Date/Time:", recorded_at)
+            print()
 
-    # Store each returned value in an easy-to-understand variable
-    system_code = record[0]
-    capacity = record[1]
-    occupancy = record[2]
-    record_datetime = record[3]
-
-    # Calculate how many parking spaces were available
-    available = capacity - occupancy
-
-    # Display the parking information
-    print("Parking Lot:", system_code)
-    print("Capacity:", capacity)
-    print("Occupancy:", occupancy)
-    print("Available Spaces:", available)
-    print("Date/Time:", record_datetime)
-    print()
+    finally:
+        connection.close()
 
 
-# Close the database connection when we are finished
-connection.close()
+if __name__ == "__main__":
+    try:
+        analyze_parking()
+    except mysql.connector.Error as exc:
+        print(f"Database error: {exc}")
+        raise SystemExit(1) from exc
