@@ -3,17 +3,23 @@ import argparse
 import csv
 import os
 from datetime import datetime
+from getpass import getpass
 
 import mysql.connector
 
 
 def connect():
-    """Connect using environment variables, without storing credentials in code."""
+    """Connect to MySQL using environment variables or a password prompt."""
+    password = os.getenv('MYSQL_PASSWORD')
+
+    if password is None:
+        password = getpass("Enter MySQL password: ")
+
     return mysql.connector.connect(
         host=os.getenv('MYSQL_HOST', 'localhost'),
         port=int(os.getenv('MYSQL_PORT', '3306')),
-        user=os.getenv('MYSQL_USER', 'root'),
-        password=os.getenv('MYSQL_PASSWORD', ''),
+        user=os.getenv('MYSQL_USER', 'parking_app'),
+        password=password,
         database=os.getenv('MYSQL_DATABASE', 'parking_tracker'),
     )
 

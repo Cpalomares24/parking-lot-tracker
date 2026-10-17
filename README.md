@@ -115,7 +115,33 @@ GRANT SELECT, INSERT, UPDATE ON parking_tracker.* TO 'parking_app'@'localhost';
 
 Do not repeat `CREATE USER` if the account already exists. These permissions are sufficient for the CSV importer and analysis scripts, not for creating the schema. Never commit real passwords.
 
-The migrated I/O scripts share the `connect()` function in `import_data.py`. It reads `MYSQL_HOST` (default `localhost`), `MYSQL_PORT` (default `3306`), `MYSQL_USER` (default `root`), `MYSQL_PASSWORD` (default empty), and `MYSQL_DATABASE` (default `parking_tracker`).
+#### Database Connection
+
+The migrated I/O scripts (`import_data.py`, `analyze_parking.py`, and `availability_by_hour.py`) share the `connect()` function in `import_data.py`.
+
+By default, the scripts connect to the `parking_tracker` database using the `parking_app` account. When executed, they automatically prompt for the MySQL password:
+
+```text
+Enter MySQL password:
+```
+
+The password is hidden while typing and is not stored in the source code.
+
+**No additional configuration is required** after creating the `parking_app` account.
+
+#### Optional: Environment Variables
+
+Environment variables can also be used to customize the connection or avoid entering the password every time a script runs.
+
+The following variables are supported:
+
+| Variable | Default |
+| --- | --- |
+| `MYSQL_HOST` | `localhost` |
+| `MYSQL_PORT` | `3306` |
+| `MYSQL_USER` | `parking_app` |
+| `MYSQL_PASSWORD` | Prompts for password if unset |
+| `MYSQL_DATABASE` | `parking_tracker` |
 
 **Linux / macOS (Bash):**
 
@@ -137,7 +163,17 @@ Remove-Variable securePassword
 
 These settings apply only to the current terminal session. Set `MYSQL_HOST`, `MYSQL_PORT`, or `MYSQL_DATABASE` similarly if your installation differs.
 
-**Important difference in the existing search scripts:** `mysql_parking_data.py` and `parking_search.py` currently use the hardcoded username `root` and ask for a MySQL root password. They **do not** read the `MYSQL_*` environment variables. To run them unchanged, a password-authenticated MySQL root account must be available. Alternatively, change their local connection username to an authorized account such as `parking_app` and enter that account's password when prompted. Do not commit local credential changes. On Ubuntu, socket-authenticated root (`auth_socket`) cannot log in through those password-based Python connections without a configuration change.
+If `MYSQL_PASSWORD` is configured, the scripts use that value without prompting. Otherwise, they request the password interactively using Python's `getpass()` function.
+
+#### Existing Search Scripts
+
+**Important difference in the existing search scripts:** `mysql_parking_data.py` and `parking_search.py` currently use the hardcoded username `root` and ask for a MySQL root password. They **do not** read the `MYSQL_*` environment variables or use the shared `connect()` function.
+
+To run them unchanged, a password-authenticated MySQL root account must be available.
+
+Alternatively, change their local connection username from `root` to an authorized account such as `parking_app` and enter that account's password when prompted. Do not commit local credential changes.
+
+On Ubuntu, socket-authenticated root (`auth_socket`) cannot log in through those password-based Python connections without a configuration change.
 
 ### 5. Obtain the sample dataset
 
@@ -171,7 +207,7 @@ Confirm the file is located at `data/dataset.csv`. The local `data/` directory i
 
 ### 6. Import the CSV into MySQL
 
-With the virtual environment activated and the `MYSQL_*` variables configured:
+With the virtual environment activated and the database account created in Step 4:
 
 ```bash
 python import_data.py data/dataset.csv
@@ -226,7 +262,7 @@ These values were verified against the Python CSV importer on MySQL Server 8.0.4
 
 ### 8. Run the analysis scripts
 
-These scripts use the shared environment-variable connection configuration from step 4:
+These scripts use the shared MySQL connection function from Step 4 and prompt for the database password when needed.
 
 ```bash
 python analyze_parking.py
