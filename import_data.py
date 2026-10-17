@@ -1,142 +1,95 @@
-# Import Python's built-in CSV module so we can read the dataset
+"""Import UCI Parking Birmingham-compatible CSV files into the existing MySQL schema."""
+import argparse
 import csv
-# Import SQLite so Python can create and work with our database
-import sqlite3
+import os
+from datetime import datetime
 
-# Connect to the SQLite database
-# If parksmart.db does not exist, Python will create it automatically
-connection = sqlite3.connect("parksmart.db")
+import mysql.connector
 
-# Create a cursor that allows Python to send commands to SQLite
-cursor = connection.cursor()
 
-# Create the parking_location table
-# parking_id is the primary key
-# system_code identifies parking location; UNIQUE prevents accidentally creating system_code hundreds of times
-# capacity stores how many spaces that parking location can hold
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS parking_location (
-        parking_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        system_code TEXT NOT NULL UNIQUE,
-        capacity INTEGER NOT NULL
+def connect():
+    """Connect using environment variables, without storing credentials in code."""
+    return mysql.connector.connect(
+        host=os.getenv('MYSQL_HOST', 'localhost'),
+        port=int(os.getenv('MYSQL_PORT', '3306')),
+        user=os.getenv('MYSQL_USER', 'root'),
+        password=os.getenv('MYSQL_PASSWORD', ''),
+        database=os.getenv('MYSQL_DATABASE', 'parking_tracker'),
     )
-""")
 
-# Create the parking_record table
-# This table stores the occupancy measurements for each parking location
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS parking_record (
-        record_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        parking_id INTEGER NOT NULL,
-        record_datetime TEXT NOT NULL,
-        occupancy INTEGER NOT NULL,
 
-        FOREIGN KEY (parking_id)
-            REFERENCES parking_location(parking_id)
-    )
-""")
+def import_csv(path):
+    """Import readings atomically into existing MySQL tables."""
+    stats = {'rows': 0, 'lots_added': 0, 'readings_added': 0, 'duplicates': 0}
+    connection = connect()
+    try:
+        cursor = connection.cursor()
+        lot_ids = {}
+        lot_capacities = {}
+        with open(path, newline='', encoding='utf-8-sig') as file:
+            reader = csv.DictReader(file)
+            required = {'SystemCodeNumber', 'Capacity', 'Occupancy', 'LastUpdated'}
+            if not required.issubset(reader.fieldnames or []):
+                raise ValueError('CSV missing columns: ' + ', '.join(sorted(required - set(reader.fieldnames or []))))
+            for line, row in enumerate(reader, start=2):
+                try:
+                    code = row['SystemCodeNumber'].strip()
+                    capacity = int(row['Capacity'])
+                    occupied = int(row['Occupancy'])
+                    recorded = datetime.strptime(row['LastUpdated'].strip(), '%Y-%m-%d %H:%M:%S')
+                    if not code or capacity <= 0:
+                        raise ValueError('lot code must be present and capacity must be positive')
+                except (ValueError, TypeError, AttributeError) as exc:
+                    raise ValueError(f'Invalid CSV row {line}: {exc}') from exc
+                stats['rows'] += 1
+                # Each lot has one capacity; reject inconsistent CSV rows.
+                if code in lot_capacities and lot_capacities[code] != capacity:
+                    raise ValueError(
+                        f'Row {line}: capacity mismatch for {code}: '
+                        f'expected={lot_capacities[code]}, CSV={capacity}'
+                    )
+                if code not in lot_ids:
+                    cursor.execute('SELECT lot_id, capacity FROM parking_lot WHERE lot_code = %s', (code,))
+                    existing = cursor.fetchone()
+                    if existing:
+                        lot_id, saved_capacity = existing
+                        if saved_capacity != capacity:
+                            raise ValueError(f'Row {line}: capacity mismatch for {code}: database={saved_capacity}, CSV={capacity}')
+                    else:
+                        cursor.execute('INSERT INTO parking_lot (lot_code, capacity) VALUES (%s, %s)', (code, capacity))
+                        lot_id = cursor.lastrowid
+                        stats['lots_added'] += 1
+                    # Reuse existing lots instead of modifying their metadata.
+                    lot_ids[code] = lot_id
+                    lot_capacities[code] = capacity
+                # Keep negative/over-capacity readings: v_occupancy flags them.
+                # The unique (lot_id, recorded_at) key prevents duplicates.
+                # Existing readings are left unchanged on repeat imports.
+                cursor.execute('''INSERT INTO occupancy_reading
+                    (lot_id, recorded_at, occupied_count)
+                    VALUES (%s, %s, %s)
+                    ON DUPLICATE KEY UPDATE reading_id = reading_id''',
+                    (lot_ids[code], recorded, occupied))
+                if cursor.rowcount == 1:
+                    stats['readings_added'] += 1
+                else:
+                    stats['duplicates'] += 1
+        # Commit only after every row succeeds; failures roll back the import.
+        connection.commit()
+        return stats
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
 
-# Count duplicate parking records before creating the unique index
-cursor.execute("""
-    SELECT COUNT(*)
-    FROM (
-        SELECT parking_id, record_datetime
-        FROM parking_record
-        GROUP BY parking_id, record_datetime
-        HAVING COUNT(*) > 1
-    )
-""")
 
-# Get the number of duplicate parking location/time combinations
-duplicate_count = cursor.fetchone()[0]
-
-# Display the number of duplicates
-print("Duplicate parking records:", duplicate_count)
-
-# Save the changes to the database
-connection.commit()
-
-print("Connected to ParkSmart database!")
-print()
-
-# Clear existing parking records before importing the CSV
-# This prevents the entire dataset from being duplicated
-# if this import program is run more than once
-cursor.execute("DELETE FROM parking_record")
-
-# Save the deletion before starting the new import
-connection.commit()
-
-# Open the Birmingham parking CSV file
-with open("data/dataset.csv", "r") as file:
-
-    # Read the CSV using the column names as keys
-    reader = csv.DictReader(file)
-
-    # Loop through each row in the CSV
-    # "i" keeps track of the row number
-    # "row" contains the parking data for that row
-    for i, row in enumerate(reader):
-
-        # Convert capacity and occupancy from text into numbers
-        capacity = int(row["Capacity"])
-        occupancy = int(row["Occupancy"])
-
-        # Calculate the number of available parking spaces
-        available = capacity - occupancy
-
-        # Get the parking lot's system code from the CSV
-        system_code = row["SystemCodeNumber"]
-
-        # Insert the parking location into SQLite
-        # INSERT OR IGNORE prevents duplicate parking locations
-        cursor.execute("""
-            INSERT OR IGNORE INTO parking_location (system_code, capacity)
-            VALUES (?, ?)
-        """, (system_code, capacity))
-
-        # Find the parking_id that belongs to this system code
-        cursor.execute("""
-            SELECT parking_id
-            FROM parking_location
-            WHERE system_code = ?
-        """, (system_code,))
-
-        # Get the parking_id returned by SQLite
-        parking_id = cursor.fetchone()[0]
-
-        # Get the date and time of this parking measurement
-        record_datetime = row["LastUpdated"]
-
-        # Insert the occupancy measurement into parking_record
-        cursor.execute("""
-            INSERT INTO parking_record (parking_id, record_datetime, occupancy)
-            VALUES (?, ?, ?)
-        """, (parking_id, record_datetime, occupancy))
-
-# Save all inserted parking locations to the database
-connection.commit()
-
-print("Parking locations imported successfully!")
-print()
-
-# Ask SQLite to count how many parking locations are in the database
-cursor.execute("SELECT COUNT(*) FROM parking_location")
-
-# Get the result returned by SQLite
-location_count = cursor.fetchone()[0]
-
-# Display the number of parking locations
-print("Total parking locations:", location_count)
-
-# Count how many parking records were imported
-cursor.execute("SELECT COUNT(*) FROM parking_record")
-
-# Get the total number of parking records
-record_count = cursor.fetchone()[0]
-
-# Display the total number of parking records
-print("Total parking records:", record_count)
-
-# Close the database connection
-connection.close()
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('csv_file', nargs='?', default='data/dataset.csv')
+    args = parser.parse_args()
+    try:
+        for key, value in import_csv(args.csv_file).items():
+            print(f'{key}: {value}')
+    except (OSError, ValueError, mysql.connector.Error) as exc:
+        parser.exit(1, f'Import failed: {exc}\n')
