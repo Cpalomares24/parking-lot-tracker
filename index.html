@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0e2438" />
+  <title>ParkSmart | Birmingham Parking Insights</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="#home" aria-label="ParkSmart home"><span class="brand-icon">P</span> Park<span>Smart</span></a><nav><a href="#explore">Explore garages</a><a href="#trends">Trends</a><a href="#about">About</a></nav><span class="demo-tag">Historical data demo</span></header>
+  <main id="home">
+    <section class="hero"><div class="hero-content"><div class="eyebrow">BIRMINGHAM PARKING INTELLIGENCE</div><h1>Less searching.<br /><em>More parking.</em></h1><p>Explore parking demand patterns, compare garages, and find the best time to park—using historical data.</p><a class="hero-button" href="#explore">Explore parking garages <span aria-hidden="true">↗</span></a></div><div class="hero-art" aria-hidden="true"><div class="road"><span class="car">🚙</span><span class="road-mark"></span><span class="road-mark"></span><span class="road-mark"></span></div><div class="hero-stat"><span>Typical availability at 2 PM</span><strong>39.28%</strong><small>Historical average across observations</small></div></div></section>
+    <section class="metrics" aria-label="Summary"><article class="metric"><span>Parking locations</span><strong id="locationCount">5</strong><small>Illustrative garage list</small></article><article class="metric"><span>Average availability</span><strong id="hourAverage">39.28%</strong><small id="selectedHourLabel">At 2:00 PM · historical</small></article><article class="metric"><span>Most crowded hour</span><strong>2 PM</strong><small>Based on supplied hourly analysis</small></article><article class="metric"><span>Dataset</span><strong>2016</strong><small>UCI Parking Birmingham</small></article></section>
+    <section id="explore" class="section"><div class="section-heading"><div><span class="eyebrow dark">PARKING EXPLORER</span><h2>Find your next parking spot</h2><p>Compare example garages by historical availability. Search and change the hour to explore the prototype.</p></div></div><div class="filters"><label>Search garages<input id="search" type="search" placeholder="Search by garage code..." /></label><label>Time of day<select id="hourSelect"></select></label><label>Sort by<select id="sortSelect"><option value="available">Most available</option><option value="busy">Busiest first</option><option value="name">Garage code</option></select></label><label>Parking type<select id="typeSelect"><option value="all">All parking types</option><option value="general">General parking</option><option value="permit">Permit parking</option><option value="reserved">Reserved parking</option></select></label><label>Payment<select id="paymentSelect"><option value="all">Paid & free</option><option value="paid">Paid parking</option><option value="free">Free parking</option></select></label><label>Availability<select id="statusSelect"><option value="all">Any availability</option><option value="high">Plenty of space (60%+)</option><option value="moderate">Moderate (30–59%)</option><option value="busy">Busy (under 30%)</option></select></label><div class="filter-actions"><span id="resultsLabel" aria-live="polite"></span><button id="resetFilters" type="button">Clear filters</button></div></div><div id="garageGrid" class="garage-grid" aria-live="polite"></div></section>
+    <section id="trends" class="section trends"><div class="section-heading"><div><span class="eyebrow dark">PARKING TRENDS</span><h2>When is parking easiest?</h2><p>Average percentage of spaces available across historical parking observations, by hour.</p></div><span class="chart-legend"><i></i> Available spaces (%)</span></div><div class="chart-card"><div class="chart-head"><strong>Hourly availability</strong><span>7 AM – 4 PM</span></div><div class="chart" id="hourChart" role="img" aria-label="Hourly historical average availability bar chart"></div><p class="chart-note">These hourly values are from the team's earlier Python analysis. They do not represent live parking availability.</p></div></section>
+    <section id="about" class="section"><div class="info-grid"><article class="info-card"><span class="info-icon">🚧</span><h3>Closures & restrictions</h3><p>Future support for maintenance, events, weather closures, permits, and temporary restrictions.</p><span class="coming">Integration planned</span></article><article class="info-card"><span class="info-icon">📊</span><h3>Simulated scenarios</h3><p>Support for custom-generated parking datasets and performance-testing scenarios.</p><span class="coming">Integration planned</span></article></div></section>
+    <dialog id="garageDialog" class="garage-dialog" aria-labelledby="dialogTitle">
+      <div class="dialog-head"><span class="eyebrow dark">PARKING LOCATION DETAILS</span><button id="closeDialog" class="dialog-close" type="button" aria-label="Close garage details">×</button></div>
+      <h2 id="dialogTitle"></h2><p id="dialogArea" class="dialog-subtitle"></p>
+      <div id="dialogStatus"></div>
+      <div class="dialog-metrics"><div><small>Typical availability</small><strong id="dialogPercent"></strong></div><div><small>Estimated free spaces</small><strong id="dialogFreeSpaces"></strong></div><div><small>Capacity</small><strong id="dialogCapacity"></strong></div><div><small>Selected time</small><strong id="dialogHour"></strong></div></div>
+      <div class="dialog-progress"><div id="dialogFill"></div></div>
+      <h3>Parking information</h3><div id="dialogAttributes" class="dialog-attributes"></div>
+      <h3>Availability by hour</h3><p class="dialog-hint">Illustrative estimates for this garage, not real-time or verified garage-level measurements.</p>
+      <div id="dialogChart" class="dialog-chart" aria-label="Illustrative hourly garage availability"></div>
+      <div class="dialog-notice"><strong>Closures and special hours</strong><p>Not connected yet. Chris can populate this section from the team's closure, holiday and special-hours tables.</p></div>
+      <p class="dialog-disclaimer">Prototype demonstration only. Payment, parking type, and individual garage estimates are sample values.</p>
+    </dialog>
+  </main><footer><div><strong>ParkSmart</strong><p>CS 514 · Student project prototype</p></div><p>Historical trends and illustrative garage data only · Not real-time availability</p></footer>
+  <script src="data.js"></script><script src="script.js"></script>
+</body>
+</html>
